@@ -26,6 +26,10 @@ class SumstatsParser(object):
 
     """
 
+    # Subclasses set this to a list of essential column names (post-rename) on which to
+    # check for missing values. None means check all columns (original behaviour of dropping all rows with NA)
+    _essential_cols = None
+
     def __init__(self, col_name_converter=None, **read_csv_kwargs):
         """
         Initialize the summary statistics parser.
@@ -55,18 +59,29 @@ class SumstatsParser(object):
         """
         Parse a summary statistics file.
         :param file_name: The path to the summary statistics file.
-        :param drop_na: If True, drop any entries with missing values.
+        :param drop_na: Controls missing-value filtering after parsing.
+            - True (default): drop rows with NAs in the format's essential columns
+              (defined by `_essential_cols`; falls back to all columns for the base parser).
+            - dict: passed directly as keyword arguments to `DataFrame.dropna()`,
+              e.g. `{"subset": ["CHR", "BETA", "SE"]}` for full user control.
+            - False: no rows are dropped.
 
         :return: A pandas DataFrame containing the parsed summary statistics.
         """
 
         df = pd.read_csv(file_name, **self.read_csv_kwargs)
 
-        if drop_na:
-            df = df.dropna()
-
         if self.col_name_converter is not None:
             df.rename(columns=self.col_name_converter, inplace=True)
+
+        if drop_na:
+            if isinstance(drop_na, dict):
+                df = df.dropna(**drop_na)
+            else:
+                subset = self._essential_cols
+                if subset is not None:
+                    subset = [c for c in subset if c in df.columns]
+                df = df.dropna(subset=subset or None)
 
         try:
             df['POS'] = df['POS'].astype(np.int32)
@@ -91,6 +106,8 @@ class Plink2SSParser(SumstatsParser):
     :ivar read_csv_kwargs: Keyword arguments to pass to pandas' `read_csv`.
 
     """
+
+    _essential_cols = ['CHR', 'SNP', 'A1', 'BETA', 'SE']
 
     def __init__(self, col_name_converter=None, **read_csv_kwargs):
         """
@@ -164,6 +181,8 @@ class Plink1SSParser(SumstatsParser):
 
     """
 
+    _essential_cols = ['CHR', 'SNP', 'A1', 'A2', 'BETA', 'SE']
+
     def __init__(self, col_name_converter=None, **read_csv_kwargs):
         """
         Initialize the `plink1.9` summary statistics parser.
@@ -203,6 +222,8 @@ class COJOSSParser(SumstatsParser):
     :ivar col_name_converter: A dictionary mapping column names in the original table to magenpy's column names.
     :ivar read_csv_kwargs: Keyword arguments to pass to pandas' `read_csv`.
     """
+
+    _essential_cols = ['SNP', 'A1', 'A2', 'BETA', 'SE']
 
     def __init__(self, col_name_converter=None, **read_csv_kwargs):
         """
@@ -246,6 +267,8 @@ class FastGWASSParser(SumstatsParser):
 
     """
 
+    _essential_cols = ['CHR', 'SNP', 'A1', 'A2', 'BETA', 'SE']
+
     def __init__(self, col_name_converter=None, **read_csv_kwargs):
         """
         :param col_name_converter: A dictionary/string mapping column names
@@ -286,6 +309,8 @@ class SSFParser(SumstatsParser):
     :ivar read_csv_kwargs: Keyword arguments to pass to pandas' `read_csv`.
 
     """
+
+    _essential_cols = ['CHR', 'POS', 'A1', 'A2', 'BETA', 'SE']
 
     def __init__(self, col_name_converter=None, **read_csv_kwargs):
         """
@@ -339,6 +364,8 @@ class SaigeSSParser(SumstatsParser):
     :ivar read_csv_kwargs: Keyword arguments to pass to pandas' `read_csv`.
 
     """
+
+    _essential_cols = ['CHR', 'POS', 'SNP', 'A1', 'A2', 'Z', 'MAF', 'MAC']
 
     def __init__(self, col_name_converter=None, **read_csv_kwargs):
         """
